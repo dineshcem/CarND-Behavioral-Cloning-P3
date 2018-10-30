@@ -119,13 +119,13 @@ The final model architecture (model.py lines 64-81) consisted of a convolution n
 
 To capture good driving behavior, I recorded two laps of data by running vehicle through the center. On data is driving in actual direction and another in reverse direction.
 
-![alt text][frnt_c.jpg?raw=true "Front"]
-![alt text][rev_c.jpg?raw=true "Reverse"]
+![jpg](frnt_c.jpg)
+![jpg](rev_c.jpg)
 
 I then recorded the vehicle recovering from the left side and right sides of the road back to center so that the vehicle would learn to recover from the edges of track .Following images show what a recovery looks like.
-![alt text][1.jpg]
-![alt text][2.jpg]
-![alt text][3.jpg]
+![jpg](1.jpg)
+![jpg](2.jpg)
+![jpg](3.jpg)
 
 
 To augment the data sat, I also flipped images and angles thinking that this would help to generate more data for better learning. For better perfomance I have added correction to steering angle for left and right camera images by 0.2 and -0.2.
