@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 import os
-import ntpath
 from keras.models import Sequential
 from keras.layers import Dense, Flatten, Lambda, Convolution2D, MaxPooling2D, Cropping2D, Dropout
 from sklearn.model_selection import train_test_split
@@ -10,8 +9,6 @@ import csv
 import logging
 from keras.utils import plot_model
 
-
-logging.basicConfig(level=logging.INFO)
 
 
 def generator(samples, batch_size=32):
@@ -32,19 +29,9 @@ def generator(samples, batch_size=32):
             correct_factor = [0.0, 0.2, -0.2]
             for batch_sample in batch_samples:
                 for i in range(3):  # 0. Center, 1. Left, 2. Right
-                    #name = batch_sample[i]
-                    
-                    source_path = line[0]
-                    #filename = source_path.split('\')[-1]
-                    #head filename = os.path.split(source_path)
-                    head, filename = ntpath.split(source_path)
-                    name = 'data/IMG/' + filename
-
-                    print(filename)
+                    name = './data/IMG/'+batch_sample[i].split('/')[-1]
+                    #print(name)
                     image = cv2.imread(name)
-                    if image is None:
-                        logging.error("Failed to open %s" % (name))
-                        continue
                     # OpenCV opens image in BGR mode whereas drive.py uses it as RGB
                     # Considering conversion of training image to RGB makes some impact
                     # on test performance/accuracy.
@@ -62,56 +49,41 @@ def generator(samples, batch_size=32):
             y_train = np.array(angles)
             yield shuffle(X_train, y_train)
 
+lines = []
+with open('data/driving_log.csv') as csvfile:
+    reader = csv.reader(csvfile)
+    for line in reader:
+        lines.append(line)
 
-if __name__ == "__main__":
-    import argparse
+train_samples, validation_samples = train_test_split(lines, test_size=0.2)
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--input')
-    args = parser.parse_args()
+train_generator = generator(train_samples, 32)
+validation_generator = generator(validation_samples, 32)
 
-    #with open(os.path.join(args.input, "data", "driving_log.csv")) as fp:
-    #    reader = csv.reader(fp)
-    #    for line in reader:
-    #       lines.append(line)
-    lines = []
-    with open('data/driving_log.csv') as csvfile:
-        reader = csv.reader(csvfile)
-        for line in reader:
-            lines.append(line)
+# NVIDIA Model
+model = Sequential()
+model.add(Lambda(lambda x: (x / 127.5) - 1.0, input_shape=(160, 320, 3)))
+model.add(Cropping2D(cropping=((70, 25), (0, 0))))
+model.add(Convolution2D(filters=24, kernel_size=(5, 5), strides=(2, 2), activation='relu'))
+model.add(Dropout(rate=0.5))
+model.add(Convolution2D(filters=36, kernel_size=(5, 5), strides=(2, 2), activation='relu'))
+model.add(Dropout(rate=0.5))
+model.add(Convolution2D(filters=48, kernel_size=(5, 5), strides=(2, 2), activation='relu'))
+model.add(Dropout(rate=0.5))
+model.add(Convolution2D(filters=64, kernel_size=(3, 3), activation='relu'))
+model.add(Dropout(rate=0.5))
+model.add(Convolution2D(filters=64, kernel_size=(3, 3), activation='relu'))
+model.add(Dropout(rate=0.5))
+model.add(Flatten())
+model.add(Dense(100))
+model.add(Dense(50))
+model.add(Dense(10))
+model.add(Dense(1))
+#model.summary()
+# plot_model(model, show_shapes=True, to_file='./examples/model_vis.png')
 
-    train_samples, validation_samples = train_test_split(lines, test_size=0.2)
+model.compile(optimizer='adam', loss='mse')
+model.fit_generator(train_generator, steps_per_epoch=len(train_samples),
+                    validation_data=validation_generator, validation_steps=len(validation_samples), epochs=2, verbose=1)
 
-    logging.info("number of training samples: %s" % (len(train_samples)))
-    logging.info("number of validation samples: %s" % (len(validation_samples)))
-
-    train_generator = generator(train_samples, 32)
-    validation_generator = generator(validation_samples, 32)
-
-    # --- NVIDIA Model ---
-    model = Sequential()
-    model.add(Lambda(lambda x: (x / 127.5) - 1.0, input_shape=(160, 320, 3)))
-    model.add(Cropping2D(cropping=((70, 25), (0, 0))))
-    model.add(Convolution2D(filters=24, kernel_size=(5, 5), strides=(2, 2), activation='relu'))
-    model.add(Dropout(rate=0.5))
-    model.add(Convolution2D(filters=36, kernel_size=(5, 5), strides=(2, 2), activation='relu'))
-    model.add(Dropout(rate=0.5))
-    model.add(Convolution2D(filters=48, kernel_size=(5, 5), strides=(2, 2), activation='relu'))
-    model.add(Dropout(rate=0.5))
-    model.add(Convolution2D(filters=64, kernel_size=(3, 3), activation='relu'))
-    model.add(Dropout(rate=0.5))
-    model.add(Convolution2D(filters=64, kernel_size=(3, 3), activation='relu'))
-    model.add(Dropout(rate=0.5))
-    model.add(Flatten())
-    model.add(Dense(100))
-    model.add(Dense(50))
-    model.add(Dense(10))
-    model.add(Dense(1))
-    model.summary()
-    # plot_model(model, show_shapes=True, to_file='./examples/model_vis.png')
-
-    model.compile(optimizer='adam', loss='mse')
-    model.fit_generator(train_generator, steps_per_epoch=len(train_samples),
-                        validation_data=validation_generator, validation_steps=len(validation_samples), epochs=2, verbose=1)
-
-    model.save('model.h5')
+model.save('model.h5')
